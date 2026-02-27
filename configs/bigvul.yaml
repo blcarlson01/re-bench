@@ -1,0 +1,8 @@
+name: bigvul_vuln
+description: Vulnerability reasoning on Big-Vul dataset
+loader: data.bigvul_loader.load_bigvul
+task: tasks.bigvul_task.bigvul_task
+scorers:
+  - scorers.vuln_f1_scorer.VulnF1Scorer
+  - scorers.explanation_similarity_scorer.ExplanationSimilarityScorer
+  - scorers.hallucination_scorer.HallucinationScorer

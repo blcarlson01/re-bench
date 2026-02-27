@@ -1,0 +1,8 @@
+name: ember_malware
+description: Malware classification using EMBER dataset
+loader: data.ember_loader.load_ember
+task: tasks.ember_task.ember_malware_task
+scorers:
+  - scorers.malware_scorer.MalwareBehaviorScorer
+  - scorers.explanation_similarity_scorer.ExplanationSimilarityScorer
+  - scorers.hallucination_scorer.HallucinationScorer

@@ -1,0 +1,17 @@
+name: agent_reverse_engineering
+steps:
+  - name: analyze_imports
+    prompt: |
+      Analyze imports:
+      {imports}
+  - name: analyze_strings
+    prompt: |
+      Analyze strings:
+      {strings}
+  - name: analyze_disasm
+    prompt: |
+      Analyze disassembly:
+      {disassembly}
+  - name: final_answer
+    prompt: |
+      Combine findings. What does this binary do? Is it malicious? Why?

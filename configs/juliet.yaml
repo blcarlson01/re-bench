@@ -1,0 +1,8 @@
+name: juliet_cwe
+description: CWE identification from Juliet dataset
+loader: data.juliet_loader.load_juliet
+task: tasks.juliet_task.juliet_task
+scorers:
+  - scorers.vuln_f1_scorer.VulnF1Scorer
+  - scorers.explanation_similarity_scorer.ExplanationSimilarityScorer
+  - scorers.hallucination_scorer.HallucinationScorer
