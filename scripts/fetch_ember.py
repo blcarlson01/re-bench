@@ -1,5 +1,8 @@
-import requests, gzip, json, csv
+import csv
+import json
 from pathlib import Path
+
+import requests
 
 EMBER_URLS = {
     "2017": "https://ember.elastic.co/ember_dataset.tar.bz2",
@@ -25,7 +28,6 @@ def extract_jsonl_to_csv(jsonl_path, csv_out):
 
 if __name__ == "__main__":
     Path("data/datasets/ember").mkdir(parents=True, exist_ok=True)
-    py = "ember2017.jsonl"
     # Example: download the 2017 release
     download(EMBER_URLS["2017"], "ember2017.tar.bz2")
     # You must manually extract the JSONL file after download

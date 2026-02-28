@@ -1,28 +1,38 @@
-import os, csv
-from pathlib import Path
+import csv
+import os
 
 BASE = "data/datasets/juliet/"
 OUTPUT = "data/datasets/juliet/juliet.csv"
 
-def find_files():
+
+def find_files(base=BASE):
     files = []
-    for root, _, fs in os.walk(BASE):
-        for f in fs:
-            if f.endswith(".c"):
-                files.append(os.path.join(root, f))
+    for root, _, fs in os.walk(base):
+        for file_name in fs:
+            if file_name.endswith(".c"):
+                files.append(os.path.join(root, file_name))
     return files
 
-with open(OUTPUT, "w", newline="") as csvfile:
-    writer = csv.writer(csvfile)
-    writer.writerow(["filename", "source", "cwe"])
-    for file in find_files():
-        with open(file) as src:
-            code = src.read()
-            # Extract CWE from path, e.g., CWE121 or CWE690
-            cwe = "NONE"
-            parts = file.split(os.sep)
-            for p in parts:
-                if p.startswith("CWE"):
-                    cwe = p
-                    break
-            writer.writerow([os.path.basename(file), code, cwe])
+
+def extract_cwe_from_path(file_path):
+    parts = file_path.split(os.sep)
+    for part in parts:
+        if part.startswith("CWE"):
+            return part
+    return "NONE"
+
+
+def process_juliet(base=BASE, output=OUTPUT):
+    with open(output, "w", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["filename", "source", "cwe"])
+
+        for file_path in find_files(base):
+            with open(file_path) as src:
+                code = src.read()
+            cwe = extract_cwe_from_path(file_path)
+            writer.writerow([os.path.basename(file_path), code, cwe])
+
+
+if __name__ == "__main__":
+    process_juliet()

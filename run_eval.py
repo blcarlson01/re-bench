@@ -1,31 +1,61 @@
-from loaders.task_loader import load_task_yaml, load_samples
-from scorers.malware_scorer import MalwareBehaviorScorer
-from scorers.hallucination_scorer import HallucinationScorer
-from tracing.phoenix_logger import PhoenixTraceLogger
 import csv
+from pathlib import Path
 
-phoenix = PhoenixTraceLogger()
-scorer = MalwareBehaviorScorer()
-hallucination = HallucinationScorer()
+from loaders.task_loader import load_samples, load_task_yaml
+from scorers.hallucination_scorer import HallucinationScorer
+from scorers.malware_scorer import MalwareBehaviorScorer
+from tracing.phoenix_logger import PhoenixTraceLogger
 
-task = load_task_yaml("tasks/malware_behavior.yaml")
-samples = load_samples("data/malware/samples")
-rows = []
 
-for s in samples:
-    prompt = task["question"].format(**s)
-    output = model(prompt)  # inspect-ai model wrapper
-    score = scorer.score(output, s["reference"])
-    halluc = hallucination.score(output, s["reference"], context=s)
-    print("Score:", score, "Hallucination:", halluc)
-    rows.append({
-        "sample_id": s["id"],
-        "malware_score": score,
-        "vuln_f1": vuln_score,
-        "hallucination_penalty": halluc
-    })
+def evaluate(
+    model,
+    task_path="tasks/malware_behavior.yaml",
+    samples_dir="data/malware/samples",
+    output_csv="results/latest_run.csv",
+):
+    phoenix = PhoenixTraceLogger()
+    scorer = MalwareBehaviorScorer()
+    hallucination = HallucinationScorer()
 
-with open("results/latest_run.csv", "w", newline="") as f:
-    writer = csv.DictWriter(f, fieldnames=rows[0].keys())
-    writer.writeheader()
-    writer.writerows(rows)
+    task = load_task_yaml(task_path)
+    samples = load_samples(samples_dir)
+    rows = []
+
+    for sample in samples:
+        prompt = task["question"].format(**sample)
+        output = model(prompt)
+
+        score = scorer.score(output, sample.get("reference", {}))
+        halluc = hallucination.score(output, sample)
+        rows.append(
+            {
+                "sample_id": sample.get("id", "unknown"),
+                "malware_score": score,
+                "vuln_f1": sample.get("vuln_f1", 0.0),
+                "hallucination_penalty": halluc,
+            }
+        )
+
+    out_path = Path(output_csv)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("w", newline="") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=rows[0].keys() if rows else ["sample_id", "malware_score", "vuln_f1", "hallucination_penalty"],
+        )
+        writer.writeheader()
+        writer.writerows(rows)
+
+    return {
+        "rows": len(rows),
+        "output_csv": str(out_path),
+        "phoenix": phoenix.__class__.__name__,
+    }
+
+
+def main():
+    raise RuntimeError("run_eval.main requires a model callable; call evaluate(model=...) from code.")
+
+
+if __name__ == "__main__":
+    main()

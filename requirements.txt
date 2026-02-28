@@ -5,3 +5,4 @@ rouge-score
 pandas
 matplotlib
 plotly
+numpy

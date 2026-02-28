@@ -1,5 +1,9 @@
-import requests, gzip, json, csv
+import csv
+import gzip
+import json
 from pathlib import Path
+
+import requests
 
 BASE = "https://nvd.nist.gov/feeds/json/cve/1.0/"
 YEARS = ["2024", "2023"]

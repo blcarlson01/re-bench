@@ -1,10 +1,25 @@
-import phoenix as px
-from inspect_ai.tracing import Trace
+from typing import Any
 
-px.launch_app()
+try:
+    from inspect_ai.tracing import Trace
+except Exception:
+    Trace = Any
+
+try:
+    import phoenix as px
+except Exception:
+    px = None
+
+
+def launch_phoenix_app():
+    if px is not None:
+        px.launch_app()
+
 
 class PhoenixTraceLogger:
     def log(self, trace: Trace):
+        if px is None:
+            return
         span = px.start_span("re_bench_eval")
         span.log(trace.to_dict())
         span.end()

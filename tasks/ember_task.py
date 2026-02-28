@@ -1,5 +1,4 @@
 from inspect_ai import task
-from inspect_ai.scorer import accuracy
 from phoenix.trace import log_event
 
 @task
