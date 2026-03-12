@@ -59,26 +59,7 @@ to download and preprocess automatically.
 
 # Model Configuration
 
-## Using a Remote Ollama Instance
-
-RE-Bench can evaluate against any model served by an [Ollama](https://ollama.com)
-instance running on a separate machine.  Inspect-AI uses the `ollama` provider
-which speaks the standard OpenAI-compatible REST API that Ollama exposes.
-
-### 1. Start Ollama on the remote host
-
-On the remote machine, tell Ollama to listen on all interfaces (not just
-`127.0.0.1`) and pull the model you want to evaluate:
-
-```bash
-# On the remote machine
-OLLAMA_HOST=0.0.0.0 ollama serve
-ollama pull llama3          # or any other model
-```
-
-> **Tip:** use `ollama list` to see every model available on that host.
-
-### 2. Point Inspect-AI at the remote host
+### 1. Point Inspect-AI at the remote host
 
 Set the `OLLAMA_BASE_URL` environment variable to the remote Ollama API
 endpoint before running `inspect eval`.
@@ -103,7 +84,7 @@ shown by `ollama list` on the remote host).
 > environment variable and is the most reliable way to target a specific remote
 > host. Always append `/v1` to the Ollama base URL (e.g. `http://192.168.86.230:11434/v1`).
 
-### 3. Evaluate all benchmarks against the remote model
+### 2. Evaluate all benchmarks against the remote model
 
 ```bash
 for cfg in configs/ember.yaml configs/bigvul.yaml configs/juliet.yaml configs/malwarebazaar.yaml; do
@@ -116,26 +97,6 @@ done
 foreach ($cfg in "configs/ember.yaml","configs/bigvul.yaml","configs/juliet.yaml","configs/malwarebazaar.yaml") {
     inspect eval $cfg --model ollama/llama3 --model-base-url http://<remote-host-ip>:11434/v1
 }
-```
-
-### 4. Specifying the model in task code (optional)
-
-All task factories (`tasks/*.py`) have no hardcoded model — the model is
-determined entirely by the `--model` CLI flag at eval time.  This is the
-recommended approach.
-
-If you want a task to always use a specific model without passing `--model`
-every time, add a `model=` argument to the `Task(...)` constructor:
-
-```python
-# tasks/ember_task.py (example)
-return Task(
-    dataset=MemoryDataset(samples, name="ember"),
-    solver=generate(),
-    scorer=match(location="any"),
-    model="ollama/llama3",   # ← locks this task to a specific model
-    metadata={"dataset": "ember"},
-)
 ```
 
 ---
