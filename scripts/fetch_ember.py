@@ -12,19 +12,20 @@ EMBER_URLS = {
 
 def download(url, out_path):
     r = requests.get(url, stream=True)
+    r.raise_for_status()
     with open(out_path, "wb") as f:
         for chunk in r.iter_content(1024):
             f.write(chunk)
 
 def extract_jsonl_to_csv(jsonl_path, csv_out):
     out_fields = ["sha256", "label"]
-    with open(csv_out, "w", newline="") as csvfile:
+    with open(csv_out, "w", newline="", encoding="utf-8") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=out_fields)
         writer.writeheader()
-        with open(jsonl_path, "rt") as f:
+        with open(jsonl_path, "rt", encoding="utf-8") as f:
             for line in f:
                 obj = json.loads(line)
-                writer.writerow({"sha256":obj["sha256"], "label":obj["label"]})
+                writer.writerow({"sha256": obj["sha256"], "label": obj["label"]})
 
 if __name__ == "__main__":
     Path("data/datasets/ember").mkdir(parents=True, exist_ok=True)

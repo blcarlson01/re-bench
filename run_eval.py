@@ -4,7 +4,6 @@ from pathlib import Path
 from loaders.task_loader import load_samples, load_task_yaml
 from scorers.hallucination_scorer import HallucinationScorer
 from scorers.malware_scorer import MalwareBehaviorScorer
-from tracing.phoenix_logger import PhoenixTraceLogger
 
 
 def evaluate(
@@ -13,7 +12,6 @@ def evaluate(
     samples_dir="data/malware/samples",
     output_csv="results/latest_run.csv",
 ):
-    phoenix = PhoenixTraceLogger()
     scorer = MalwareBehaviorScorer()
     hallucination = HallucinationScorer()
 
@@ -22,7 +20,7 @@ def evaluate(
     rows = []
 
     for sample in samples:
-        prompt = task["question"].format(**sample)
+        prompt = task["question"].format(**{k: str(v) for k, v in sample.items()})
         output = model(prompt)
 
         score = scorer.score(output, sample.get("reference", {}))
@@ -38,7 +36,7 @@ def evaluate(
 
     out_path = Path(output_csv)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    with out_path.open("w", newline="") as f:
+    with out_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
             f,
             fieldnames=rows[0].keys() if rows else ["sample_id", "malware_score", "vuln_f1", "hallucination_penalty"],
@@ -49,7 +47,6 @@ def evaluate(
     return {
         "rows": len(rows),
         "output_csv": str(out_path),
-        "phoenix": phoenix.__class__.__name__,
     }
 
 

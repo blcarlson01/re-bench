@@ -29,7 +29,9 @@ def main():
     for sample in obj.get("samples", []):
         target = str(sample.get("target", "benign")).strip().lower()
         completion = str(sample.get("output", {}).get("completion", "")).strip()
-        pred = "malware" if "malware" in completion.lower() else "benign"
+        completion_lower = completion.lower()
+        _malware_terms = {"malware", "malicious", "trojan", "ransomware", "spyware", "worm", "rootkit", "adware"}
+        pred = "malware" if any(term in completion_lower for term in _malware_terms) else "benign"
 
         rows.append(
             {

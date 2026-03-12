@@ -7,5 +7,5 @@
 # correctly without needing a native Inspect YAML format.
 try:
     import tasks.inspect_alias_tasks  # noqa: F401
-except Exception:
+except ImportError:
     pass

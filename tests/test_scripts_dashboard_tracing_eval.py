@@ -30,6 +30,10 @@ def test_fetch_ember_helpers(tmp_path, monkeypatch):
 
     class FakeResp:
         @staticmethod
+        def raise_for_status():
+            pass
+
+        @staticmethod
         def iter_content(_):
             yield b"abc"
 
@@ -47,7 +51,10 @@ def test_fetch_ember_helpers(tmp_path, monkeypatch):
 def test_fetch_malwarebazaar_helpers(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "scripts.fetch_malwarebazaar.requests.post",
-        lambda *a, **k: SimpleNamespace(json=lambda: {"data": [{"sha256_hash": "x", "signature": "fam", "file_type": "exe"}]}),
+        lambda *a, **k: SimpleNamespace(
+            raise_for_status=lambda: None,
+            json=lambda: {"data": [{"sha256_hash": "x", "signature": "fam", "file_type": "exe"}]},
+        ),
     )
     data = fetch_all()
     assert len(data) == 1
@@ -84,7 +91,7 @@ def test_fetch_nvd_helpers(tmp_path, monkeypatch):
 
     monkeypatch.setattr(
         "scripts.fetch_nvd_cve.requests.get",
-        lambda url: SimpleNamespace(content=b"abc"),
+        lambda url: SimpleNamespace(content=b"abc", raise_for_status=lambda: None),
     )
     monkeypatch.chdir(tmp_path)
     path = fetch_year("2024")

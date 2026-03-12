@@ -6,3 +6,5 @@ pandas
 matplotlib
 plotly
 numpy
+pyyaml>=6.0
+requests>=2.28

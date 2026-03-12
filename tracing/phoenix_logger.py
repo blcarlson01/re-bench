@@ -2,12 +2,12 @@ from typing import Any
 
 try:
     from inspect_ai.tracing import Trace
-except Exception:
+except ImportError:
     Trace = Any
 
 try:
     import phoenix as px
-except Exception:
+except (ImportError, SyntaxError):
     px = None
 
 

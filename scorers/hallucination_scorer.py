@@ -19,7 +19,7 @@ class HallucinationScorer(Scorer):
                     grounded_fields.append(str(value))
 
         grounded_text = " ".join(grounded_fields).lower()
-        output_tokens = re.findall(r"[a-zA-Z_][a-zA-Z0-9_\\.-]*", text.lower())
+        output_tokens = re.findall(r"[a-zA-Z_][a-zA-Z0-9_.-]*", text.lower())
 
         if not output_tokens:
             return 1.0

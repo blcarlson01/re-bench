@@ -23,12 +23,12 @@ def extract_cwe_from_path(file_path):
 
 
 def process_juliet(base=BASE, output=OUTPUT):
-    with open(output, "w", newline="") as csvfile:
+    with open(output, "w", newline="", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(["filename", "source", "cwe"])
 
         for file_path in find_files(base):
-            with open(file_path) as src:
+            with open(file_path, encoding="utf-8") as src:
                 code = src.read()
             cwe = extract_cwe_from_path(file_path)
             writer.writerow([os.path.basename(file_path), code, cwe])

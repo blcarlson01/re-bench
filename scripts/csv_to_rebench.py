@@ -10,7 +10,7 @@ csv_to_jsonl(
 '''
 def csv_to_jsonl(csv_path, jsonl_path, mapping):
     df = pd.read_csv(csv_path)
-    with open(jsonl_path, "w") as out:
+    with open(jsonl_path, "w", encoding="utf-8") as out:
         for _, row in df.iterrows():
             obj = {k: row[v] for k, v in mapping.items()}
             out.write(json.dumps(obj) + "\n")
