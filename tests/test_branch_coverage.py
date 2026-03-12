@@ -67,43 +67,22 @@ def test_scorer_edge_branches():
     assert vuln.macro_f1([], []) == 0.0
 
 
-def test_task_hallucination_branches(monkeypatch):
-    inspect_module = SimpleNamespace(task=lambda fn: fn)
-    scorer_module = SimpleNamespace(accuracy=object())
-    phoenix_module = SimpleNamespace()
-    phoenix_trace = SimpleNamespace(log_event=lambda *a, **k: None)
+def test_task_factories_return_task_objects():
+    """Verify all task factories are importable and return proper Task objects.
 
-    monkeypatch.setitem(sys.modules, "inspect_ai", inspect_module)
-    monkeypatch.setitem(sys.modules, "inspect_ai.scorer", scorer_module)
-    monkeypatch.setitem(sys.modules, "phoenix", phoenix_module)
-    monkeypatch.setitem(sys.modules, "phoenix.trace", phoenix_trace)
+    Replaces the legacy hallucination-logging branch test, which relied on
+    the removed ``sample.model()`` call pattern.
+    """
+    from inspect_ai import Task
+    from tasks.bigvul_task import bigvul_task
+    from tasks.juliet_task import juliet_task
+    from tasks.malwarebazaar_task import malwarebazaar_task
 
-    for module_name in ("tasks.bigvul_task", "tasks.juliet_task", "tasks.malwarebazaar_task"):
-        if module_name in sys.modules:
-            del sys.modules[module_name]
-
-    bigvul = importlib.import_module("tasks.bigvul_task")
-    juliet = importlib.import_module("tasks.juliet_task")
-    malware = importlib.import_module("tasks.malwarebazaar_task")
-
-    calls = []
-    monkeypatch.setattr(bigvul, "log_event", lambda *a, **k: calls.append(("bigvul", a, k)))
-    monkeypatch.setattr(juliet, "log_event", lambda *a, **k: calls.append(("juliet", a, k)))
-    monkeypatch.setattr(malware, "log_event", lambda *a, **k: calls.append(("malware", a, k)))
-
-    class Fake(dict):
-        def model(self, prompt):
-            if "vulnerability researcher" in prompt:
-                return "imaginary_function CWE-79"
-            if "Analyze the code" in prompt:
-                return "syscall CWE-79"
-            return "reg\\SOFTWARE\\FAKEKEY encrypt"
-
-    bigvul.bigvul_task(Fake({"code": "x", "cwe": "CWE-79"}))
-    juliet.juliet_task(Fake({"code": "int main(){}", "cwe": "CWE-79"}))
-    malware.malwarebazaar_task(Fake({"family": "fam", "file_type": "exe"}))
-
-    assert len(calls) == 3
+    for factory in (bigvul_task, juliet_task, malwarebazaar_task):
+        result = factory()
+        assert isinstance(result, Task)
+        assert len(result.dataset) >= 1
+        assert result.scorer is not None
 
 
 def test_tracing_branches(monkeypatch):
