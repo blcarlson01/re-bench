@@ -1,8 +1,58 @@
-import json
-import subprocess
+import re
 from pathlib import Path
 
 import pandas as pd
+from inspect_ai.log import read_eval_log
+
+_MALWARE_TERMS = {"malware", "malicious", "trojan", "ransomware", "spyware", "worm", "rootkit", "adware"}
+_CWE_RE = re.compile(r"cwe-\d+", re.IGNORECASE)
+
+
+def _is_cwe_target(target: str) -> bool:
+    """Return True if *target* looks like a CWE identifier (e.g. CWE-121)."""
+    return bool(_CWE_RE.fullmatch(target.strip()))
+
+
+def _extract_cwe(text: str) -> str:
+    """Return the first CWE-NNN found in *text*, else 'NONE'."""
+    m = _CWE_RE.search(text)
+    return m.group(0).upper() if m else "NONE"
+
+
+def _build_row_from(raw_target: str, completion: str, sample_id, model_name: str) -> dict:
+    completion_lower = completion.lower()
+
+    if _is_cwe_target(raw_target):
+        # ---- CWE identification task (Juliet / BigVul) ----
+        true_cwe = raw_target.upper()
+        pred_cwe = _extract_cwe(completion)
+        match = float(pred_cwe == true_cwe)
+        return {
+            "sample_id": sample_id,
+            "model_version": model_name,
+            "true_behavior": true_cwe,
+            "pred_behavior": pred_cwe,
+            "malware_score": 0.0,
+            "vuln_f1": match,
+            "hallucination_penalty": 0.0,
+            "explanation": completion,
+            "cwe": true_cwe,
+        }
+    else:
+        # ---- Malware classification task (Ember / MalwareBazaar) ----
+        target = raw_target.lower()
+        pred = "malware" if any(term in completion_lower for term in _MALWARE_TERMS) else "benign"
+        return {
+            "sample_id": sample_id,
+            "model_version": model_name,
+            "true_behavior": target,
+            "pred_behavior": pred,
+            "malware_score": float(pred == target),
+            "vuln_f1": 0.0,
+            "hallucination_penalty": 0.0,
+            "explanation": completion,
+            "cwe": "NONE",
+        }
 
 
 def main():
@@ -16,51 +66,29 @@ def main():
         raise FileNotFoundError(f"No Inspect .eval logs found in {logs_dir}")
 
     latest_log = log_files[0]
-    proc = subprocess.run(
-        ["inspect", "log", "dump", str(latest_log)],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    obj = json.loads(proc.stdout)
+    log = read_eval_log(str(latest_log))
 
-    model_name = obj.get("eval", {}).get("model", "unknown")
+    model_name = (log.eval.model if log.eval else None) or "unknown"
     rows = []
-    for sample in obj.get("samples", []):
-        target = str(sample.get("target", "benign")).strip().lower()
-        completion = str(sample.get("output", {}).get("completion", "")).strip()
-        completion_lower = completion.lower()
-        _malware_terms = {"malware", "malicious", "trojan", "ransomware", "spyware", "worm", "rootkit", "adware"}
-        pred = "malware" if any(term in completion_lower for term in _malware_terms) else "benign"
-
-        rows.append(
-            {
-                "sample_id": sample.get("id", "unknown"),
-                "model_version": model_name,
-                "true_behavior": target,
-                "pred_behavior": pred,
-                "malware_score": float(pred == target),
-                "vuln_f1": 0.0,
-                "hallucination_penalty": 0.0,
-                "explanation": completion,
-                "cwe": "NONE",
-            }
-        )
+    for sample in (log.samples or []):
+        target = str(sample.target or "benign").strip()
+        completion = ""
+        if sample.output and sample.output.choices:
+            completion = str(sample.output.choices[0].message.content or "").strip()
+        rows.append(_build_row_from(target, completion, sample.id, model_name))
 
     if not rows:
-        rows.append(
-            {
-                "sample_id": "fallback-0",
-                "model_version": model_name,
-                "true_behavior": "benign",
-                "pred_behavior": "benign",
-                "malware_score": 1.0,
-                "vuln_f1": 0.0,
-                "hallucination_penalty": 0.0,
-                "explanation": "",
-                "cwe": "NONE",
-            }
-        )
+        rows.append({
+            "sample_id": "fallback-0",
+            "model_version": model_name,
+            "true_behavior": "benign",
+            "pred_behavior": "benign",
+            "malware_score": 1.0,
+            "vuln_f1": 0.0,
+            "hallucination_penalty": 0.0,
+            "explanation": "",
+            "cwe": "NONE",
+        })
 
     out_csv = out_dir / "latest_run.csv"
     pd.DataFrame(rows).to_csv(out_csv, index=False)

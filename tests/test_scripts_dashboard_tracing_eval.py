@@ -8,10 +8,10 @@ import pandas as pd
 from dashboard.app import build_dashboard_figure
 from run_eval import evaluate
 from scripts.csv_to_rebench import csv_to_jsonl
-from scripts.fetch_ember import download, extract_jsonl_from_tar, generate_sample_dataset
+from scripts.fetch_ember import download, extract_jsonl_from_tar, generate_sample_dataset as ember_generate_sample
 from scripts.fetch_malwarebazaar import fetch_all, write_csv
 from scripts.fetch_nvd_cve import fetch_year, parse_to_csv
-from scripts.process_juliet import extract_cwe_from_path, find_files, process_juliet
+from scripts.process_juliet import extract_cwe_from_path, find_files, generate_sample_dataset as juliet_generate_sample, process_juliet
 from tracing.phoenix_logger import PhoenixTraceLogger
 
 
@@ -45,7 +45,7 @@ def test_fetch_ember_helpers(tmp_path, monkeypatch):
 
     # generate_sample_dataset writes JSONL (sha256 + label) consumed by ember_task.py
     out_jsonl = tmp_path / "ember.json"
-    n = generate_sample_dataset(n=10, out_jsonl=out_jsonl)
+    n = ember_generate_sample(n=10, out_jsonl=out_jsonl)
     assert n == 10
     lines = [json.loads(l) for l in out_jsonl.read_text(encoding="utf-8").splitlines()]
     assert len(lines) == 10
@@ -131,6 +131,15 @@ def test_process_juliet_helpers(tmp_path):
     output = tmp_path / "out.csv"
     process_juliet(base=str(tmp_path / "juliet"), output=str(output))
     assert output.exists()
+
+    # generate_sample_dataset produces a CSV usable by juliet_task.py
+    sample_out = tmp_path / "sample.csv"
+    n = juliet_generate_sample(n=8, output=str(sample_out))
+    assert n == 8
+    df = pd.read_csv(sample_out)
+    assert list(df.columns) == ["filename", "source", "cwe"]
+    assert len(df) == 8
+    assert df["cwe"].str.startswith("CWE").all()
 
 
 def test_dashboard_build_figure(tmp_path):
