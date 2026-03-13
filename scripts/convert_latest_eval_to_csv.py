@@ -38,8 +38,8 @@ def _build_row_from(raw_target: str, completion: str, sample_id, model_name: str
             "explanation": completion,
             "cwe": true_cwe,
         }
-    else:
-        # ---- Malware classification task (Ember / MalwareBazaar) ----
+    elif raw_target.lower() in {"malware", "benign"}:
+        # ---- Binary malware/benign classification (Ember) ----
         target = raw_target.lower()
         pred = "malware" if any(term in completion_lower for term in _MALWARE_TERMS) else "benign"
         return {
@@ -48,6 +48,23 @@ def _build_row_from(raw_target: str, completion: str, sample_id, model_name: str
             "true_behavior": target,
             "pred_behavior": pred,
             "malware_score": float(pred == target),
+            "vuln_f1": 0.0,
+            "hallucination_penalty": 0.0,
+            "explanation": completion,
+            "cwe": "NONE",
+        }
+    else:
+        # ---- Family-name prediction (MalwareBazaar) ----
+        target_lower = raw_target.lower()
+        found = target_lower in completion_lower
+        tokens = completion.split()
+        pred = raw_target if found else (tokens[0] if tokens else "unknown")
+        return {
+            "sample_id": sample_id,
+            "model_version": model_name,
+            "true_behavior": raw_target,
+            "pred_behavior": pred,
+            "malware_score": float(found),
             "vuln_f1": 0.0,
             "hallucination_penalty": 0.0,
             "explanation": completion,

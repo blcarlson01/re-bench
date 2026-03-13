@@ -10,7 +10,7 @@ from run_eval import evaluate
 from scripts.csv_to_rebench import csv_to_jsonl
 from scripts.fetch_bigvul import generate_sample_dataset as bigvul_generate_sample, download_bigvul
 from scripts.fetch_ember import download, extract_jsonl_from_tar, generate_sample_dataset as ember_generate_sample
-from scripts.fetch_malwarebazaar import fetch_all, write_csv
+from scripts.fetch_malwarebazaar import fetch_all, generate_sample_dataset as malwarebazaar_generate_sample, write_csv
 from scripts.fetch_nvd_cve import fetch_year, parse_to_csv
 from scripts.process_juliet import extract_cwe_from_path, find_files, generate_sample_dataset as juliet_generate_sample, process_juliet
 from tracing.phoenix_logger import PhoenixTraceLogger
@@ -74,7 +74,7 @@ def test_fetch_malwarebazaar_helpers(tmp_path, monkeypatch):
         "scripts.fetch_malwarebazaar.requests.post",
         lambda *a, **k: SimpleNamespace(
             raise_for_status=lambda: None,
-            json=lambda: {"data": [{"sha256_hash": "x", "signature": "fam", "file_type": "exe"}]},
+            json=lambda: {"data": [{"sha256_hash": "x", "signature": "fam", "file_type": "exe", "imphash": ""}]},
         ),
     )
     data = fetch_all()
@@ -84,6 +84,21 @@ def test_fetch_malwarebazaar_helpers(tmp_path, monkeypatch):
     monkeypatch.setattr("scripts.fetch_malwarebazaar.OUTPUT", str(output))
     write_csv(data)
     assert output.exists()
+    rows = list(csv.DictReader(output.open(encoding="utf-8")))
+    assert rows[0]["sha256_hash"] == "x"
+    assert rows[0]["signature"] == "fam"
+
+
+def test_fetch_malwarebazaar_sample(tmp_path):
+    out = tmp_path / "metadata.csv"
+    n = malwarebazaar_generate_sample(10, str(out))
+    assert n == 10
+    rows = list(csv.DictReader(out.open(encoding="utf-8")))
+    assert len(rows) == 10
+    assert all({"sha256_hash", "signature", "file_type", "imphash"} <= set(r.keys()) for r in rows)
+    assert all(r["signature"] for r in rows)
+    # sha256_hash should look like a 64-char hex string
+    assert all(len(r["sha256_hash"]) == 64 for r in rows)
 
 
 def test_fetch_nvd_helpers(tmp_path, monkeypatch):
