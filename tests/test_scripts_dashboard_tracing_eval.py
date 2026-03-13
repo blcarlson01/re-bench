@@ -8,6 +8,7 @@ import pandas as pd
 from dashboard.app import build_dashboard_figure
 from run_eval import evaluate
 from scripts.csv_to_rebench import csv_to_jsonl
+from scripts.fetch_bigvul import generate_sample_dataset as bigvul_generate_sample, download_bigvul
 from scripts.fetch_ember import download, extract_jsonl_from_tar, generate_sample_dataset as ember_generate_sample
 from scripts.fetch_malwarebazaar import fetch_all, write_csv
 from scripts.fetch_nvd_cve import fetch_year, parse_to_csv
@@ -116,6 +117,44 @@ def test_fetch_nvd_helpers(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     path = fetch_year("2024")
     assert (tmp_path / path).exists()
+
+
+def test_fetch_bigvul_sample(tmp_path):
+    out = tmp_path / "bigvul.csv"
+    n = bigvul_generate_sample(10, str(out))
+    assert n == 10
+    rows = list(csv.DictReader(out.open(encoding="utf-8")))
+    assert len(rows) == 10
+    assert all({"id", "func", "cwe"} <= set(r.keys()) for r in rows)
+    assert all(r["cwe"].startswith("CWE-") for r in rows)
+
+
+def test_fetch_bigvul_download(tmp_path, monkeypatch):
+    """download_bigvul should stream the CSV and reformat to id/func/cwe."""
+    import io
+    raw_csv = "Unnamed: 0,func,cwe_id\n0,void foo(){},CWE-119\n1,void bar(){},CWE-78\n"
+
+    class FakeResp:
+        headers = {"Content-Length": str(len(raw_csv.encode()))}
+
+        def raise_for_status(self):
+            pass
+
+        def iter_content(self, **kwargs):
+            yield raw_csv.encode()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+    monkeypatch.setattr("scripts.fetch_bigvul.requests.get", lambda *a, **k: FakeResp())
+    out = tmp_path / "bigvul.csv"
+    count = download_bigvul(str(out))
+    assert count == 2
+    rows = list(csv.DictReader(out.open(encoding="utf-8")))
+    assert [r["cwe"] for r in rows] == ["CWE-119", "CWE-78"]
 
 
 def test_process_juliet_helpers(tmp_path):
