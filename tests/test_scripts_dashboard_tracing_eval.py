@@ -8,7 +8,7 @@ import pandas as pd
 from dashboard.app import build_dashboard_figure
 from run_eval import evaluate
 from scripts.csv_to_rebench import csv_to_jsonl
-from scripts.fetch_ember import download, extract_jsonl_to_csv
+from scripts.fetch_ember import download, extract_jsonl_from_tar, generate_sample_dataset
 from scripts.fetch_malwarebazaar import fetch_all, write_csv
 from scripts.fetch_nvd_cve import fetch_year, parse_to_csv
 from scripts.process_juliet import extract_cwe_from_path, find_files, process_juliet
@@ -29,23 +29,43 @@ def test_fetch_ember_helpers(tmp_path, monkeypatch):
     target = tmp_path / "download.bin"
 
     class FakeResp:
+        headers = {"Content-Length": "3"}
+
         @staticmethod
         def raise_for_status():
             pass
 
         @staticmethod
-        def iter_content(_):
+        def iter_content(**kwargs):
             yield b"abc"
 
     monkeypatch.setattr("scripts.fetch_ember.requests.get", lambda *a, **k: FakeResp())
     download("http://x", target)
     assert target.read_bytes() == b"abc"
 
-    jsonl = tmp_path / "a.jsonl"
-    out_csv = tmp_path / "o.csv"
-    jsonl.write_text(json.dumps({"sha256": "s", "label": 1}) + "\n", encoding="utf-8")
-    extract_jsonl_to_csv(jsonl, out_csv)
-    assert "sha256" in pd.read_csv(out_csv).columns
+    # generate_sample_dataset writes JSONL (sha256 + label) consumed by ember_task.py
+    out_jsonl = tmp_path / "ember.json"
+    n = generate_sample_dataset(n=10, out_jsonl=out_jsonl)
+    assert n == 10
+    lines = [json.loads(l) for l in out_jsonl.read_text(encoding="utf-8").splitlines()]
+    assert len(lines) == 10
+    assert all("sha256" in l and "label" in l for l in lines)
+
+    # extract_jsonl_from_tar: create a minimal .tar.bz2 containing one .jsonl file
+    import gzip as _gzip, tarfile as _tarfile, io as _io
+    row = json.dumps({"sha256": "abc123", "label": 1}) + "\n"
+    buf = _io.BytesIO(row.encode())
+    tar_buf = _io.BytesIO()
+    with _tarfile.open(fileobj=tar_buf, mode="w:bz2") as tf:
+        info = _tarfile.TarInfo(name="ember_train.jsonl")
+        info.size = len(row)
+        tf.addfile(info, buf)
+    tar_path = tmp_path / "ember.tar.bz2"
+    tar_path.write_bytes(tar_buf.getvalue())
+    out2 = tmp_path / "out.json"
+    count = extract_jsonl_from_tar(tar_path, out2)
+    assert count == 1
+    assert json.loads(out2.read_text(encoding="utf-8"))["sha256"] == "abc123"
 
 
 def test_fetch_malwarebazaar_helpers(tmp_path, monkeypatch):

@@ -38,7 +38,7 @@ def _plot_time_series_regression(df, score_column):
     plt.figure()
     plt.plot(x_sorted, y_sorted, marker="o", linestyle="-", alpha=0.8, label="Score")
 
-    if len(x_sorted) >= 2:
+    if len(set(x_sorted)) >= 2:
         slope, intercept = np.polyfit(x_sorted, y_sorted, 1)
         trend = slope * x_sorted + intercept
         plt.plot(x_sorted, trend, linestyle="--", label="Regression")
@@ -50,6 +50,7 @@ def _plot_time_series_regression(df, score_column):
     plt.title("Time-Series Regression: model_version vs score")
     plt.legend()
     plt.tight_layout()
+    plt.close()
 
 
 def run_analysis(csv_path=None):

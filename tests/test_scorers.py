@@ -33,8 +33,8 @@ def test_explanation_similarity_scorer(monkeypatch):
     inspect_ai_scorer_module.Scorer = DummyScorer
     inspect_ai_module.scorer = inspect_ai_scorer_module
 
-    sys.modules["inspect_ai"] = inspect_ai_module
-    sys.modules["inspect_ai.scorer"] = inspect_ai_scorer_module
+    monkeypatch.setitem(sys.modules, "inspect_ai", inspect_ai_module)
+    monkeypatch.setitem(sys.modules, "inspect_ai.scorer", inspect_ai_scorer_module)
 
     bert_score_module = types.ModuleType("bert_score")
     bert_score_module.score = lambda preds, refs, lang, rescale_with_baseline: (None, None, [0.9])
@@ -48,9 +48,9 @@ def test_explanation_similarity_scorer(monkeypatch):
     rouge_scorer_module.RougeScorer = lambda *a, **k: FakeRouge()
     rouge_module.rouge_scorer = rouge_scorer_module
 
-    sys.modules["bert_score"] = bert_score_module
-    sys.modules["rouge_score"] = rouge_module
-    sys.modules["rouge_score.rouge_scorer"] = rouge_scorer_module
+    monkeypatch.setitem(sys.modules, "bert_score", bert_score_module)
+    monkeypatch.setitem(sys.modules, "rouge_score", rouge_module)
+    monkeypatch.setitem(sys.modules, "rouge_score.rouge_scorer", rouge_scorer_module)
 
     if "scorers.explanation_similarity_scorer" in sys.modules:
         del sys.modules["scorers.explanation_similarity_scorer"]
