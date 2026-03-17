@@ -1,0 +1,12 @@
+name: big15_assembly
+description: BIG-15 malware assembly analysis (MITRE mapping, family classification, assembly understanding)
+loader: data.big15_loader.load_big15
+task: tasks.big15_task.big15_task
+scorers:
+  # mitre_mapping / family_classification tasks — accuracy with normalization
+  - scorers.accuracy_scorer.AccuracyScorer
+  # assembly_understanding tasks — LLM judge rubric (0-3, normalized to [0,1])
+  - scorers.llm_judge_scorer.LLMJudgeScorer
+  # cross-cutting quality metrics
+  - scorers.explanation_similarity_scorer.ExplanationSimilarityScorer
+  - scorers.hallucination_scorer.HallucinationScorer

@@ -9,10 +9,13 @@ the four config paths directly.
 
 from inspect_ai import task
 
+from tasks.big15_task import big15_task
 from tasks.bigvul_task import bigvul_task
 from tasks.ember_task import ember_malware_task
 from tasks.juliet_task import juliet_task
+from tasks.malrec_task import malrec_task
 from tasks.malwarebazaar_task import malwarebazaar_task
+from tasks.meld_task import meld_task
 
 
 @task(name="configs/ember.yaml")
@@ -33,3 +36,18 @@ def _juliet_config():
 @task(name="configs/malwarebazaar.yaml")
 def _malwarebazaar_config():
     return malwarebazaar_task()
+
+
+@task(name="configs/big15.yaml")
+def _big15_config():
+    return big15_task()
+
+
+@task(name="configs/meld.yaml")
+def _meld_config():
+    return meld_task()
+
+
+@task(name="configs/malrec.yaml")
+def _malrec_config():
+    return malrec_task()

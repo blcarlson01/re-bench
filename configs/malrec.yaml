@@ -1,0 +1,12 @@
+name: malrec_execution_traces
+description: Malrec execution trace analysis (behavior explanation, capability extraction)
+loader: data.malrec_loader.load_malrec
+task: tasks.malrec_task.malrec_task
+scorers:
+  # capability_extraction tasks — macro F1 (multi-label)
+  - scorers.malware_scorer.MalwareBehaviorScorer
+  # behavior_explanation tasks — LLM judge rubric (0-3, normalized to [0,1])
+  - scorers.llm_judge_scorer.LLMJudgeScorer
+  # cross-cutting quality metrics
+  - scorers.explanation_similarity_scorer.ExplanationSimilarityScorer
+  - scorers.hallucination_scorer.HallucinationScorer

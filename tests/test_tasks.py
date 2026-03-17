@@ -43,3 +43,30 @@ def test_malwarebazaar_task():
     assert len(result.dataset) >= 1
     assert result.scorer is not None
 
+
+def test_big15_task():
+    from tasks.big15_task import big15_task
+
+    result = big15_task()
+    assert isinstance(result, Task)
+    assert len(result.dataset) >= 1
+    assert result.scorer is not None
+
+
+def test_meld_task():
+    from tasks.meld_task import meld_task
+
+    result = meld_task()
+    assert isinstance(result, Task)
+    assert len(result.dataset) >= 1
+    assert result.scorer is not None
+
+
+def test_malrec_task():
+    from tasks.malrec_task import malrec_task
+
+    result = malrec_task()
+    assert isinstance(result, Task)
+    assert len(result.dataset) >= 1
+    assert result.scorer is not None
+

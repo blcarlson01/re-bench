@@ -6,6 +6,24 @@ from inspect_ai.log import read_eval_log
 
 _MALWARE_TERMS = {"malware", "malicious", "trojan", "ransomware", "spyware", "worm", "rootkit", "adware"}
 _CWE_RE = re.compile(r"cwe-\d+", re.IGNORECASE)
+_MITRE_RE = re.compile(r"\bT\d{4}(?:\.\d+)?\b", re.IGNORECASE)
+
+# Known BIG-15 / mama_bench behavior keywords for assembly_understanding tasks
+_BEHAVIOR_KEYWORDS = {
+    "process injection", "registry persistence", "obfuscation",
+    "network communication", "encryption", "credential theft",
+    "persistence", "discovery", "command and control", "c2",
+    "keylogging", "payload download", "service installation",
+    "file system enumeration", "system enumeration", "rootkit", "ransomware",
+}
+
+# BIG-15 family names (15 families from the Microsoft Kaggle competition)
+_BIG15_FAMILIES = {
+    "ramnit", "lollipop", "kelihos_ver3", "vundo", "simda",
+    "tracur", "kelihos_ver1", "obfuscator.acy", "gatak",
+    "bho", "lolyda.aa1", "lolyda.aa2", "lolyda.aa3", "lolyda.at",
+    "fakerean",
+}
 
 
 def _is_cwe_target(target: str) -> bool:
@@ -13,10 +31,35 @@ def _is_cwe_target(target: str) -> bool:
     return bool(_CWE_RE.fullmatch(target.strip()))
 
 
+def _is_mitre_target(target: str) -> bool:
+    """Return True if *target* is a MITRE ATT&CK technique ID (e.g. T1055)."""
+    return bool(_MITRE_RE.fullmatch(target.strip()))
+
+
+def _is_behavior_keyword(target: str) -> bool:
+    """Return True if *target* is a known behavior keyword (assembly_understanding)."""
+    return target.strip().lower() in _BEHAVIOR_KEYWORDS
+
+
+def _is_big15_family(target: str) -> bool:
+    """Return True if *target* is a known BIG-15 malware family name."""
+    return target.strip().lower() in _BIG15_FAMILIES
+
+
 def _extract_cwe(text: str) -> str:
     """Return the first CWE-NNN found in *text*, else 'NONE'."""
     m = _CWE_RE.search(text)
     return m.group(0).upper() if m else "NONE"
+
+
+def _extract_mitre(text: str) -> str:
+    """Return the first T-NNNN technique ID found in *text*, else 'UNKNOWN'."""
+    m = _MITRE_RE.search(text)
+    if m:
+        # Normalise to base technique ID (strip sub-technique suffix)
+        base = re.sub(r"\.\d+$", "", m.group(0).upper())
+        return base
+    return "UNKNOWN"
 
 
 def _build_row_from(raw_target: str, completion: str, sample_id, model_name: str) -> dict:
@@ -53,8 +96,41 @@ def _build_row_from(raw_target: str, completion: str, sample_id, model_name: str
             "explanation": completion,
             "cwe": "NONE",
         }
+    elif _is_mitre_target(raw_target):
+        # ---- MITRE ATT&CK mapping (BIG-15 / MELD mitre_mapping tasks) ----
+        true_technique = raw_target.upper()
+        pred_technique = _extract_mitre(completion)
+        match = float(pred_technique == true_technique)
+        return {
+            "sample_id": sample_id,
+            "model_version": model_name,
+            "true_behavior": true_technique,
+            "pred_behavior": pred_technique,
+            "malware_score": match,
+            "vuln_f1": 0.0,
+            "hallucination_penalty": 0.0,
+            "explanation": completion,
+            "cwe": "NONE",
+        }
+    elif _is_behavior_keyword(raw_target):
+        # ---- Behavior / capability keyword (BIG-15 assembly_understanding, MELD/Malrec capability_extraction) ----
+        target_lower = raw_target.strip().lower()
+        found = target_lower in completion_lower
+        tokens = completion.split()
+        pred = raw_target if found else (tokens[0] if tokens else "unknown")
+        return {
+            "sample_id": sample_id,
+            "model_version": model_name,
+            "true_behavior": raw_target,
+            "pred_behavior": pred,
+            "malware_score": float(found),
+            "vuln_f1": 0.0,
+            "hallucination_penalty": 0.0,
+            "explanation": completion,
+            "cwe": "NONE",
+        }
     else:
-        # ---- Family-name prediction (MalwareBazaar) ----
+        # ---- Family-name prediction (MalwareBazaar / BIG-15 family_classification) ----
         target_lower = raw_target.lower()
         found = target_lower in completion_lower
         tokens = completion.split()
