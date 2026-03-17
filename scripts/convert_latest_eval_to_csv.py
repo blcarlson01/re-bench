@@ -8,7 +8,7 @@ _MALWARE_TERMS = {"malware", "malicious", "trojan", "ransomware", "spyware", "wo
 _CWE_RE = re.compile(r"cwe-\d+", re.IGNORECASE)
 _MITRE_RE = re.compile(r"\bT\d{4}(?:\.\d+)?\b", re.IGNORECASE)
 
-# Known BIG-15 / mama_bench behavior keywords for assembly_understanding tasks
+# Known BIG-15 behavior keywords for assembly_understanding tasks
 _BEHAVIOR_KEYWORDS = {
     "process injection", "registry persistence", "obfuscation",
     "network communication", "encryption", "credential theft",

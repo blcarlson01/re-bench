@@ -50,7 +50,7 @@ def _record_to_sample(record: dict, idx: int) -> Sample:
 def big15_task() -> Task:
     """BIG-15 malware assembly analysis task.
 
-    Samples cover three task types from the mama_bench spec:
+    Samples cover three task types from the spec:
     mitre_mapping, family_classification, and assembly_understanding.
     Each sample presents an assembly snippet; scored with match(location='any').
     """

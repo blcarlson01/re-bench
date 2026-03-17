@@ -45,7 +45,7 @@ def _record_to_sample(record: dict, idx: int) -> Sample:
 def malrec_task() -> Task:
     """Malrec execution-trace analysis task.
 
-    Samples cover two task types from the mama_bench spec:
+    Samples cover two task types from the spec:
     behavior_explanation and capability_extraction.
     Each sample presents a system-call execution trace;
     scored with match(location='any').

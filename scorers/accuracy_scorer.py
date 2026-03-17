@@ -1,6 +1,6 @@
 """accuracy_scorer.py — accuracy and top-K accuracy scorers.
 
-Implements the objective metrics from the mama_bench_score.md spec:
+Implements the objective metrics from the bench_score spec:
 
     accuracy = correct_predictions / total_predictions
 

@@ -52,7 +52,7 @@ def _record_to_sample(record: dict, idx: int) -> Sample:
 def meld_task() -> Task:
     """MELD API-trace and sandbox analysis task.
 
-    Samples cover three task types from the mama_bench spec:
+    Samples cover three task types from the spec:
     capability_extraction, mitre_mapping, and behavior_explanation.
     Each sample presents an API trace or sandbox report snippet;
     scored with match(location='any').

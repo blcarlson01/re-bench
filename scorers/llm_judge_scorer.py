@@ -1,6 +1,6 @@
 """llm_judge_scorer.py — LLM-as-judge rubric scorer.
 
-Implements the reasoning evaluation from the mama_bench_score.md spec.
+Implements the reasoning evaluation from the bench_score spec.
 
 Score rubric (0–3):
     0 — incorrect

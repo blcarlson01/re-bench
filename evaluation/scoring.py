@@ -1,6 +1,6 @@
 """evaluation/scoring.py — MalwareBench benchmark evaluation pipeline.
 
-Implements the full evaluation pipeline from the mama_bench_score.md spec:
+Implements the full evaluation pipeline from the bench_score spec:
 
     model inference  →  prediction normalization  →  metric computation  →  benchmark report
 

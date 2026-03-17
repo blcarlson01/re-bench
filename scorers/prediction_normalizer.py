@@ -1,6 +1,6 @@
 """prediction_normalizer.py — prediction normalization utilities.
 
-Implements the normalization pipeline from the mama_bench_score.md spec:
+Implements the normalization pipeline from the bench_score spec:
   1. lowercase conversion
   2. whitespace cleanup
   3. synonym mapping

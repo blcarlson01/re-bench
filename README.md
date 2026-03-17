@@ -9,7 +9,7 @@ It integrates:
 
 - Inspect-AI for task execution
 - Phoenix for trace logging
-- Real-world datasets (EMBER, Juliet, Big-Vul, MalwareBazaar)
+- Real-world datasets (EMBER, Juliet, Big-Vul, MalwareBazaar, BIG-15, MELD, Malrec)
 - Automated scoring
 - Full analysis + visualizations
 
@@ -20,9 +20,14 @@ It integrates:
 1. Malware Classification (EMBER)
 2. Vulnerability Detection (Big-Vul, Juliet)
 3. CWE Identification
-4. Explanation Quality (BERTScore / ROUGE)
-5. Hallucination Detection
-6. Model Regression Over Time
+4. MITRE ATT&CK Technique Mapping (BIG-15, MELD)
+5. Malware Capability Extraction (MELD, Malrec)
+6. Assembly Code Understanding (BIG-15)
+7. Malware Family Classification (BIG-15)
+8. Behavior Explanation Quality (MELD, Malrec)
+9. Explanation Quality (BERTScore / ROUGE)
+10. Hallucination Detection
+11. Model Regression Over Time
 
 ---
 
@@ -48,12 +53,22 @@ Supported:
 - Juliet Test Suite
 - Big-Vul CSV
 - MalwareBazaar metadata CSV
+- BIG-15 (assembly snippets — MITRE mapping, family classification, assembly understanding)
+- MELD (API traces + sandbox reports — capability extraction, MITRE mapping, behavior explanation)
+- Malrec (execution traces — behavior explanation, capability extraction)
 
 Use scripts in:
 
 scripts/
 
-to download and preprocess automatically.
+to download and preprocess automatically. For datasets (BIG-15, MELD, Malrec),
+run the corresponding preprocess script:
+
+```bash
+python scripts/preprocess_big15.py --sample 60   # or --path <dir>
+python scripts/preprocess_meld.py   --sample 60
+python scripts/preprocess_malrec.py --sample 60
+```
 
 ---
 
@@ -87,14 +102,16 @@ shown by `ollama list` on the remote host).
 ### 2. Evaluate all benchmarks against the remote model
 
 ```bash
-for cfg in configs/ember.yaml configs/bigvul.yaml configs/juliet.yaml configs/malwarebazaar.yaml; do
+for cfg in configs/ember.yaml configs/bigvul.yaml configs/juliet.yaml configs/malwarebazaar.yaml \
+           configs/big15.yaml configs/meld.yaml configs/malrec.yaml; do
     inspect eval "$cfg" --model ollama/llama3
 done
 ```
 
 ```powershell
 # PowerShell equivalent
-foreach ($cfg in "configs/ember.yaml","configs/bigvul.yaml","configs/juliet.yaml","configs/malwarebazaar.yaml") {
+foreach ($cfg in "configs/ember.yaml","configs/bigvul.yaml","configs/juliet.yaml","configs/malwarebazaar.yaml",
+                 "configs/big15.yaml","configs/meld.yaml","configs/malrec.yaml") {
     inspect eval $cfg --model ollama/llama3 --model-base-url http://<remote-host-ip>:11434/v1
 }
 ```
@@ -111,6 +128,19 @@ inspect eval configs/ember.yaml --model ollama/llama3
 inspect eval configs/bigvul.yaml --model ollama/llama3
 inspect eval configs/juliet.yaml --model ollama/llama3
 inspect eval configs/malwarebazaar.yaml --model ollama/llama3
+
+# datasets (preprocess first — see Dataset Setup above)
+inspect eval configs/big15.yaml --model ollama/llama3
+inspect eval configs/meld.yaml --model ollama/llama3
+inspect eval configs/malrec.yaml --model ollama/llama3
+```
+
+After any eval, generate the full benchmark report:
+
+```bash
+python scripts/convert_latest_eval_to_csv.py
+python evaluation/scoring.py --predictions results/runs/<name>_predictions.jsonl \
+    --tasks data/datasets/<name> --output results/runs/<name>_benchmark_report.json
 ```
 
 Results are written to:
@@ -139,10 +169,20 @@ You can extend this to Plotly dashboards if desired.
 # How Scoring Works
 
 MalwareBehaviorScorer:
-Binary classification accuracy.
+Binary classification accuracy (malware vs. benign).
 
 VulnF1Scorer:
 Precision / Recall / F1 over CWE labels.
+
+AccuracyScorer:
+Exact-match accuracy with label normalization for MITRE technique mapping
+and malware family classification. Handles synonyms (e.g. "process injection" → T1055)
+and strips sub-technique suffixes (T1055.001 → T1055).
+
+LLMJudgeScorer:
+Rubric-based judge (0–3, normalized to [0,1]) for assembly understanding and
+behavior explanation tasks. Falls back to keyword-overlap heuristic when
+an LLM judge is unavailable.
 
 ExplanationSimilarityScorer:
 BERTScore semantic similarity between predicted and ground truth explanation.

@@ -1,11 +1,14 @@
 # RE-Bench Formal Scoring Rubric
 
-RE-Bench evaluates reverse engineering LLMs across four orthogonal axes:
+RE-Bench evaluates reverse engineering LLMs across seven orthogonal axes:
 
 1. Malware Behavior Understanding
 2. Vulnerability Detection
-3. Explanation Quality
-4. Hallucination Robustness
+3. MITRE ATT&CK Technique Mapping
+4. Capability Extraction
+5. Assembly & Behavior Analysis (LLM Judge)
+6. Explanation Quality
+7. Hallucination Robustness
 
 Each axis is scored independently and combined into a weighted composite.
 
@@ -47,7 +50,66 @@ Macro-F1 across all CWEs is reported as primary score.
 
 ---
 
-## 3️⃣ Explanation Quality
+## 3️⃣ MITRE ATT&CK Technique Mapping
+
+**Task Type:** Single-label classification  
+**Datasets:** BIG-15, MELD  
+**Metric:** Accuracy (with normalization)
+
+Predictions are normalized before comparison:
+- Synonyms resolved (e.g. `"process injection"` → `T1055`)
+- Sub-techniques collapsed to base technique (e.g. `T1055.001` → `T1055`)
+
+| Score Range | Interpretation |
+|-------------|---------------|
+| 0.85–1.00 | Strong ATT&CK knowledge |
+| 0.65–0.84 | Moderate technique recognition |
+| < 0.65 | Weak technique mapping |
+
+---
+
+## 4️⃣ Capability Extraction
+
+**Task Type:** Multi-label extraction  
+**Datasets:** MELD, Malrec  
+**Metric:** Macro F1 (token-level, after capability normalization)
+
+Capability synonyms are normalized before scoring
+(e.g. `"dll injection"` → `"process injection"`).
+
+| Score Range | Interpretation |
+|-------------|---------------|
+| 0.80–1.00 | Accurate capability identification |
+| 0.60–0.79 | Partial capability coverage |
+| < 0.60 | Significant capability gaps |
+
+---
+
+## 5️⃣ Assembly & Behavior Analysis (LLM Judge)
+
+**Task Type:** Free-text generation  
+**Datasets:** BIG-15 (assembly understanding), MELD / Malrec (behavior explanation)  
+**Metric:** Rubric score 0–3, normalized to \[0, 1\]
+
+### Rubric
+
+| Score | Criteria |
+|-------|----------|
+| 3 | Correct technique/behavior identified with accurate supporting detail |
+| 2 | Correct identification, minor inaccuracies in detail |
+| 1 | Partially correct — relevant but incomplete or imprecise |
+| 0 | Incorrect, irrelevant, or no response |
+
+### Normalized Score
+
+$$\text{Judge Score} = \frac{\text{raw rubric score}}{3}$$
+
+A heuristic keyword-overlap fallback is used when an LLM judge is unavailable
+(≥0.75 overlap → 3, ≥0.50 → 2, ≥0.25 → 1, else 0).
+
+---
+
+## 6️⃣ Explanation Quality
 
 **Task Type:** Free-text explanation generation  
 **Metrics:**
@@ -64,7 +126,7 @@ Human spot-check validation is recommended for publication.
 
 ---
 
-## 4️⃣ Hallucination Robustness
+## 7️⃣ Hallucination Robustness
 
 Measured using:
 
@@ -82,12 +144,15 @@ Hallucination Score = 1 − (False Claims / Total Claims)
 
 Default weights:
 
-| Metric | Weight |
-|--------|--------|
-| Malware F1 | 0.30 |
-| CWE F1 | 0.35 |
-| Explanation Similarity | 0.20 |
-| Hallucination Robustness | 0.15 |
+| Metric | Weight | Datasets |
+|--------|--------|---------|
+| Malware F1 | 0.20 | EMBER, MalwareBazaar |
+| CWE F1 | 0.20 | Big-Vul, Juliet |
+| MITRE Mapping Accuracy | 0.15 | BIG-15, MELD |
+| Capability Extraction F1 | 0.15 | MELD, Malrec |
+| Assembly / Behavior Judge | 0.15 | BIG-15, MELD, Malrec |
+| Explanation Similarity | 0.10 | All |
+| Hallucination Robustness | 0.05 | All |
 
 Composite = Weighted Sum
 
