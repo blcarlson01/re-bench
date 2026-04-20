@@ -1,0 +1,17 @@
+name: sorel_behavior_tags
+description: >
+  SOREL-20M PE behavioral tag prediction and temporal drift evaluation.
+  Each sample presents PE imports, section names, and notable strings;
+  the model predicts the dominant behavioral category (ransomware, trojan,
+  backdoor, downloader, loader, worm, coinminer, or virus).
+  The time_period metadata field enables per-cohort accuracy breakdown
+  (2018-H1 through 2020-H2) to detect temporal drift in model performance.
+loader: data.sorel_loader.load_sorel
+task: tasks.sorel_task.sorel_task
+scorers:
+  # exact-match accuracy for behavioral tag labels
+  - scorers.accuracy_scorer.AccuracyScorer
+  # semantic similarity between predicted and ground-truth tag
+  - scorers.explanation_similarity_scorer.ExplanationSimilarityScorer
+  # penalise hallucinated API names / registry keys not in the prompt
+  - scorers.hallucination_scorer.HallucinationScorer

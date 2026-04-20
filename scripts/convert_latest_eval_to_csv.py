@@ -8,6 +8,12 @@ _MALWARE_TERMS = {"malware", "malicious", "trojan", "ransomware", "spyware", "wo
 _CWE_RE = re.compile(r"cwe-\d+", re.IGNORECASE)
 _MITRE_RE = re.compile(r"\bT\d{4}(?:\.\d+)?\b", re.IGNORECASE)
 
+# SOREL-20M behavioral tag labels
+_SOREL_TAGS = {
+    "ransomware", "trojan", "backdoor", "downloader",
+    "loader", "worm", "coinminer", "virus",
+}
+
 # Known BIG-15 behavior keywords for assembly_understanding tasks
 _BEHAVIOR_KEYWORDS = {
     "process injection", "registry persistence", "obfuscation",
@@ -62,8 +68,39 @@ def _extract_mitre(text: str) -> str:
     return "UNKNOWN"
 
 
-def _build_row_from(raw_target: str, completion: str, sample_id, model_name: str) -> dict:
+def _is_sorel_tag(target: str) -> bool:
+    """Return True if *target* is a SOREL-20M behavioral tag label."""
+    return target.strip().lower() in _SOREL_TAGS
+
+
+def _build_row_from(
+    raw_target: str,
+    completion: str,
+    sample_id,
+    model_name: str,
+    metadata: dict | None = None,
+) -> dict:
     completion_lower = completion.lower()
+    metadata = metadata or {}
+
+    if _is_sorel_tag(raw_target):
+        # ---- SOREL-20M behavioral tag prediction ----
+        target_lower = raw_target.strip().lower()
+        found = target_lower in completion_lower
+        tokens = completion.split()
+        pred = raw_target if found else (tokens[0].lower() if tokens else "unknown")
+        return {
+            "sample_id": sample_id,
+            "model_version": model_name,
+            "true_behavior": raw_target,
+            "pred_behavior": pred,
+            "malware_score": float(pred == target_lower),
+            "vuln_f1": 0.0,
+            "hallucination_penalty": 0.0,
+            "explanation": completion,
+            "cwe": "NONE",
+            "time_period": metadata.get("time_period", ""),
+        }
 
     if _is_cwe_target(raw_target):
         # ---- CWE identification task (Juliet / BigVul) ----
@@ -168,7 +205,7 @@ def main():
         completion = ""
         if sample.output and sample.output.choices:
             completion = str(sample.output.choices[0].message.content or "").strip()
-        rows.append(_build_row_from(target, completion, sample.id, model_name))
+        rows.append(_build_row_from(target, completion, sample.id, model_name, sample.metadata))
 
     if not rows:
         rows.append({

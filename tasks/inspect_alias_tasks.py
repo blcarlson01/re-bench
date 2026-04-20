@@ -16,6 +16,7 @@ from tasks.juliet_task import juliet_task
 from tasks.malrec_task import malrec_task
 from tasks.malwarebazaar_task import malwarebazaar_task
 from tasks.meld_task import meld_task
+from tasks.sorel_task import sorel_task
 
 
 @task(name="configs/ember.yaml")
@@ -51,3 +52,8 @@ def _meld_config():
 @task(name="configs/malrec.yaml")
 def _malrec_config():
     return malrec_task()
+
+
+@task(name="configs/sorel.yaml")
+def _sorel_config():
+    return sorel_task()

@@ -70,3 +70,16 @@ def test_malrec_task():
     assert len(result.dataset) >= 1
     assert result.scorer is not None
 
+
+def test_sorel_task():
+    from tasks.sorel_task import sorel_task
+
+    result = sorel_task()
+    assert isinstance(result, Task)
+    assert len(result.dataset) >= 1
+    assert result.scorer is not None
+    # Verify metadata fields are populated on the fallback sample
+    sample = result.dataset[0]
+    assert sample.metadata.get("dataset") == "sorel"
+    assert sample.metadata.get("time_period") is not None
+

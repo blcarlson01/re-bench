@@ -17,6 +17,15 @@ except ModuleNotFoundError:
 
 
 def _choose_score_column(df):
+    # When SOREL time_period data is present, malware_score carries per-sample
+    # accuracy; prefer it to avoid using the always-zero vuln_f1 column.
+    has_sorel = (
+        "time_period" in df.columns
+        and df["time_period"].notna().any()
+        and (df["time_period"] != "").any()
+    )
+    if has_sorel and "malware_score" in df.columns:
+        return "malware_score"
     for candidate in ("vuln_f1", "malware_score", "score"):
         if candidate in df.columns:
             return candidate
@@ -53,6 +62,43 @@ def _plot_time_series_regression(df, score_column):
     plt.close()
 
 
+def _plot_temporal_drift(df, score_column):
+    """Plot per-cohort accuracy for SOREL-20M temporal drift analysis.
+
+    Only executed when the results CSV contains a non-empty ``time_period``
+    column (populated by convert_latest_eval_to_csv.py for SOREL runs).
+    Cohorts are sorted chronologically (2018-H1 … 2020-H2).
+    """
+    if "time_period" not in df.columns:
+        return
+    drift_df = df[df["time_period"].notna() & (df["time_period"] != "")]
+    if drift_df.empty:
+        return
+
+    cohort_order = [
+        "2018-H1", "2018-H2",
+        "2019-H1", "2019-H2",
+        "2020-H1", "2020-H2",
+    ]
+    grouped = (
+        drift_df.groupby("time_period")[score_column]
+        .mean()
+        .reindex([c for c in cohort_order if c in drift_df["time_period"].values])
+    )
+
+    if grouped.empty:
+        return
+
+    plt.figure()
+    plt.bar(grouped.index, grouped.values, color="steelblue", edgecolor="white")
+    plt.xticks(rotation=30)
+    plt.xlabel("First-seen cohort (half-year)")
+    plt.ylabel(f"Mean {score_column}")
+    plt.title("SOREL-20M Temporal Drift: accuracy by first-seen cohort")
+    plt.tight_layout()
+    plt.close()
+
+
 def run_analysis(csv_path=None):
     try:
         if csv_path:
@@ -80,6 +126,7 @@ def run_analysis(csv_path=None):
     plot_behavior_confusion(behavior_confusion)
     plot_hallucination_taxonomy(hallucination_summary)
     _plot_time_series_regression(df, score_column)
+    _plot_temporal_drift(df, score_column)
     plt.show()
 
     return {

@@ -1,6 +1,7 @@
 import csv
 import gzip
 import json
+import sqlite3
 from types import SimpleNamespace
 
 import pandas as pd
@@ -12,6 +13,15 @@ from scripts.fetch_bigvul import generate_sample_dataset as bigvul_generate_samp
 from scripts.fetch_ember import download, extract_jsonl_from_tar, generate_sample_dataset as ember_generate_sample
 from scripts.fetch_malwarebazaar import fetch_all, generate_sample_dataset as malwarebazaar_generate_sample, write_csv
 from scripts.fetch_nvd_cve import fetch_year, parse_to_csv
+from scripts.fetch_sorel import (
+    SOREL_TAGS,
+    assign_time_period,
+    format_pe_input,
+    generate_sample_dataset as sorel_generate_sample,
+    make_record,
+    sample_from_meta_db,
+)
+from scripts.preprocess_sorel import process_meta_db
 from scripts.process_juliet import extract_cwe_from_path, find_files, generate_sample_dataset as juliet_generate_sample, process_juliet
 from tracing.phoenix_logger import PhoenixTraceLogger
 
@@ -48,12 +58,13 @@ def test_fetch_ember_helpers(tmp_path, monkeypatch):
     out_jsonl = tmp_path / "ember.json"
     n = ember_generate_sample(n=10, out_jsonl=out_jsonl)
     assert n == 10
-    lines = [json.loads(l) for l in out_jsonl.read_text(encoding="utf-8").splitlines()]
+    lines = [json.loads(row) for row in out_jsonl.read_text(encoding="utf-8").splitlines()]
     assert len(lines) == 10
-    assert all("sha256" in l and "label" in l for l in lines)
+    assert all("sha256" in row and "label" in row for row in lines)
 
     # extract_jsonl_from_tar: create a minimal .tar.bz2 containing one .jsonl file
-    import gzip as _gzip, tarfile as _tarfile, io as _io
+    import tarfile as _tarfile
+    import io as _io
     row = json.dumps({"sha256": "abc123", "label": 1}) + "\n"
     buf = _io.BytesIO(row.encode())
     tar_buf = _io.BytesIO()
@@ -146,7 +157,6 @@ def test_fetch_bigvul_sample(tmp_path):
 
 def test_fetch_bigvul_download(tmp_path, monkeypatch):
     """download_bigvul should stream the CSV and reformat to id/func/cwe."""
-    import io
     raw_csv = "Unnamed: 0,func,cwe_id\n0,void foo(){},CWE-119\n1,void bar(){},CWE-78\n"
 
     class FakeResp:
@@ -248,3 +258,111 @@ def test_run_eval_evaluate(tmp_path):
     result = evaluate(model=model, task_path=str(task_path), samples_dir=str(samples_dir), output_csv=str(output_csv))
     assert result["rows"] == 1
     assert output_csv.exists()
+
+
+# ---------------------------------------------------------------------------
+# SOREL-20M helpers
+# ---------------------------------------------------------------------------
+
+
+def test_sorel_assign_time_period():
+    assert assign_time_period(1546300800) == "2019-H1"
+    assert assign_time_period(1514764800) == "2018-H1"
+    assert assign_time_period(0) == "unknown"
+
+
+def test_sorel_format_pe_input():
+    imports = {"KERNEL32.dll": ["CreateFile", "WriteFile"]}
+    sections = [".text", ".data"]
+    strings = ["bitcoin", ".onion"]
+    result = format_pe_input(imports, sections, strings)
+    assert "KERNEL32.dll" in result
+    assert "CreateFile" in result
+    assert ".text" in result
+    assert "bitcoin" in result
+
+
+def test_sorel_make_record():
+    rec = make_record("abc123", "ransomware", 1577836800)
+    assert rec["id"] == "abc123"
+    assert rec["answer"] == "ransomware"
+    assert rec["dataset"] == "sorel"
+    assert rec["task"] == "behavior_tag_prediction"
+    assert rec["time_period"] == "2020-H1"
+    assert "PE Imports" in rec["input"]
+
+
+def test_sorel_generate_sample_dataset(tmp_path):
+    out = tmp_path / "sorel.jsonl"
+    n = sorel_generate_sample(n=16, out_jsonl=out)
+    assert n == 16
+    lines = [json.loads(row) for row in out.read_text(encoding="utf-8").splitlines()]
+    assert len(lines) == 16
+    required = {"id", "dataset", "artifact_type", "task", "input", "answer", "first_seen", "time_period"}
+    assert all(required <= set(rec.keys()) for rec in lines)
+    tags_seen = {rec["answer"] for rec in lines}
+    assert tags_seen <= set(SOREL_TAGS)
+    # Time periods should span multiple cohorts for n >= len(SOREL_TAGS)
+    periods_seen = {rec["time_period"] for rec in lines}
+    assert len(periods_seen) > 1
+
+
+def test_sorel_sample_from_meta_db(tmp_path):
+    db_path = tmp_path / "meta.db"
+    out = tmp_path / "sorel.jsonl"
+
+    # Build a minimal meta.db with the expected schema
+    with sqlite3.connect(str(db_path)) as con:
+        tag_cols = ", ".join(f"{t} INTEGER DEFAULT 0" for t in SOREL_TAGS)
+        con.execute(
+            f"CREATE TABLE meta (sha256 TEXT, label INTEGER, first_seen INTEGER, {tag_cols})"
+        )
+        # Row 1: ransomware dominant
+        con.execute(
+            "INSERT INTO meta VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            ("sha_r", 1, 1577836800, 5, 0, 0, 0, 0, 0, 0, 0),
+        )
+        # Row 2: trojan dominant
+        con.execute(
+            "INSERT INTO meta VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            ("sha_t", 1, 1546300800, 0, 3, 0, 0, 0, 0, 0, 0),
+        )
+        # Row 3: benign (label=0) — should not be returned
+        con.execute(
+            "INSERT INTO meta VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            ("sha_b", 0, 1546300800, 0, 0, 0, 0, 0, 0, 0, 0),
+        )
+        # Row 4: all-zero tags — should be skipped
+        con.execute(
+            "INSERT INTO meta VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            ("sha_z", 1, 1546300800, 0, 0, 0, 0, 0, 0, 0, 0),
+        )
+        con.commit()
+
+    written = sample_from_meta_db(db_path, n=10, out_jsonl=out)
+    assert written == 2  # only sha_r and sha_t qualify
+    lines = [json.loads(row) for row in out.read_text(encoding="utf-8").splitlines()]
+    answers = {rec["answer"] for rec in lines}
+    assert answers == {"ransomware", "trojan"}
+
+
+def test_sorel_process_meta_db(tmp_path):
+    db_path = tmp_path / "meta.db"
+    out = tmp_path / "sorel.jsonl"
+
+    with sqlite3.connect(str(db_path)) as con:
+        tag_cols = ", ".join(f"{t} INTEGER DEFAULT 0" for t in SOREL_TAGS)
+        con.execute(
+            f"CREATE TABLE meta (sha256 TEXT, label INTEGER, first_seen INTEGER, {tag_cols})"
+        )
+        con.execute(
+            "INSERT INTO meta VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            ("sha_worm", 1, 1530316800, 0, 0, 0, 0, 0, 4, 0, 0),
+        )
+        con.commit()
+
+    written = process_meta_db(db_path, n=5, out_jsonl=out)
+    assert written == 1
+    rec = json.loads(out.read_text(encoding="utf-8").strip())
+    assert rec["answer"] == "worm"
+    assert rec["time_period"] == "2018-H2"

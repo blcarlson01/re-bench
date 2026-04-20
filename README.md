@@ -9,7 +9,7 @@ It integrates:
 
 - Inspect-AI for task execution
 - Phoenix for trace logging
-- Real-world datasets (EMBER, Juliet, Big-Vul, MalwareBazaar, BIG-15, MELD, Malrec)
+- Real-world datasets (EMBER, Juliet, Big-Vul, MalwareBazaar, BIG-15, MELD, Malrec, SOREL-20M)
 - Automated scoring
 - Full analysis + visualizations
 
@@ -28,6 +28,8 @@ It integrates:
 9. Explanation Quality (BERTScore / ROUGE)
 10. Hallucination Detection
 11. Model Regression Over Time
+12. PE Behavioral Tag Prediction (SOREL-20M)
+13. Temporal Drift — accuracy vs. first-seen cohort (SOREL-20M)
 
 ---
 
@@ -56,6 +58,7 @@ Supported:
 - BIG-15 (assembly snippets — MITRE mapping, family classification, assembly understanding)
 - MELD (API traces + sandbox reports — capability extraction, MITRE mapping, behavior explanation)
 - Malrec (execution traces — behavior explanation, capability extraction)
+- SOREL-20M (PE metadata — behavioral tag prediction, temporal drift evaluation)
 
 Use scripts in:
 
@@ -68,6 +71,21 @@ run the corresponding preprocess script:
 python scripts/preprocess_big15.py --sample 60   # or --path <dir>
 python scripts/preprocess_meld.py   --sample 60
 python scripts/preprocess_malrec.py --sample 60
+```
+
+For SOREL-20M, choose one of:
+
+```bash
+# Quick synthetic sample — no download required:
+python scripts/fetch_sorel.py --sample 60
+
+# Full download from S3 (~3.5 GB, requires AWS CLI, no credentials needed):
+# ⚠️  Accept the Sophos/ReversingLabs Terms of Use first:
+# https://github.com/sophos/SOREL-20M/blob/master/Terms%20and%20Conditions%20of%20Use.pdf
+python scripts/fetch_sorel.py --fetch --sample 1000
+
+# Or process an already-downloaded meta.db:
+python scripts/preprocess_sorel.py --path data/datasets/sorel/meta.db --sample 1000
 ```
 
 ---
@@ -103,7 +121,7 @@ shown by `ollama list` on the remote host).
 
 ```bash
 for cfg in configs/ember.yaml configs/bigvul.yaml configs/juliet.yaml configs/malwarebazaar.yaml \
-           configs/big15.yaml configs/meld.yaml configs/malrec.yaml; do
+           configs/big15.yaml configs/meld.yaml configs/malrec.yaml configs/sorel.yaml; do
     inspect eval "$cfg" --model ollama/llama3
 done
 ```
@@ -111,7 +129,7 @@ done
 ```powershell
 # PowerShell equivalent
 foreach ($cfg in "configs/ember.yaml","configs/bigvul.yaml","configs/juliet.yaml","configs/malwarebazaar.yaml",
-                 "configs/big15.yaml","configs/meld.yaml","configs/malrec.yaml") {
+                 "configs/big15.yaml","configs/meld.yaml","configs/malrec.yaml","configs/sorel.yaml") {
     inspect eval $cfg --model ollama/llama3 --model-base-url http://<remote-host-ip>:11434/v1
 }
 ```
@@ -133,6 +151,9 @@ inspect eval configs/malwarebazaar.yaml --model ollama/llama3
 inspect eval configs/big15.yaml --model ollama/llama3
 inspect eval configs/meld.yaml --model ollama/llama3
 inspect eval configs/malrec.yaml --model ollama/llama3
+
+# SOREL-20M (fetch_sorel.py or preprocess_sorel.py first — see Dataset Setup above)
+inspect eval configs/sorel.yaml --model ollama/llama3
 ```
 
 After any eval, generate the full benchmark report:
@@ -170,6 +191,14 @@ You can extend this to Plotly dashboards if desired.
 
 MalwareBehaviorScorer:
 Binary classification accuracy (malware vs. benign).
+
+AccuracyScorer (behavior_tag_prediction):
+Exact-match accuracy for SOREL-20M behavioral tag labels
+(ransomware, trojan, backdoor, downloader, loader, worm, coinminer, virus).
+The ``time_period`` metadata field (2018-H1 through 2020-H2) enables
+temporal drift plots in analysis/run_analysis.py: accuracy broken down
+by half-year first-seen cohort reveals whether model performance degrades
+on samples from later in the dataset.
 
 VulnF1Scorer:
 Precision / Recall / F1 over CWE labels.
